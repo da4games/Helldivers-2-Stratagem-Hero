@@ -38,7 +38,7 @@ class DataCollector:
 
     def parser(self, soup, csv_path: str = "stratagems.csv"):
         if soup is None:
-            return
+            return {}
 
         # If a raw string was returned, parse it into a BeautifulSoup object
         if isinstance(soup, str):
@@ -48,13 +48,13 @@ class DataCollector:
                 soup = BeautifulSoup(soup, "html.parser")
             except Exception:
                 print("Warning: unable to parse HTML string")
-                return
+                return {}
 
         # target all wikitables by class and merge them
         tables = soup.select(".wikitable")
         if not tables:
             print("No matching table found")
-            return
+            return {}
 
         def parse_table(table):
             rows = []
@@ -92,8 +92,14 @@ class DataCollector:
                         imgs = cell.select("img")
 
                     if imgs:
-                        alts = [img.get("alt", "").strip() for img in imgs if img.has_attr("alt")]
-                        cell_text = (" | ".join(alts) if alts else cell.get_text(" ", strip=True))
+                        alts = [
+                            img.get("alt", "").strip()
+                            for img in imgs
+                            if img.has_attr("alt")
+                        ]
+                        cell_text = (
+                            " | ".join(alts) if alts else cell.get_text(" ", strip=True)
+                        )
                     else:
                         cell_text = cell.get_text(" ", strip=True)
 
@@ -113,41 +119,49 @@ class DataCollector:
 
             return rows
 
-        combined_rows = []
+        # Map table indices to output filenames
+        table_filenames = {
+            0: csv_path,  # First table uses the provided csv_path
+            1: "mission_stratagems.csv",  # Second table goes here
+        }
+        
+        all_rows = {}
         for idx, table in enumerate(tables):
             rows = parse_table(table)
             if not rows:
                 continue
 
-            # If this is a subsequent table and its first row matches the first table header,
-            # drop that header to avoid duplication (same headers/datastructure expected).
-            if idx > 0 and combined_rows and rows:
-                first_header = combined_rows[0]
-                candidate = rows[0]
-                m = min(len(first_header), len(candidate))
-                if m > 0 and all((first_header[i].strip() if i < len(first_header) else "") == (candidate[i].strip() if i < len(candidate) else "") for i in range(m)):
-                    rows = rows[1:]
+            # Determine output filename for this table
+            output_filename = table_filenames.get(idx, f"table_{idx}.csv")
 
-            combined_rows.extend(rows)
+            if not rows:
+                print(f"No rows extracted from table {idx}")
+                continue
 
-        if not combined_rows:
-            print("No rows extracted from tables")
-            return
+            # normalize rows to equal length and write CSV
+            max_cols = max(len(r) for r in rows)
+            csv_file = Path(output_filename)
+            with csv_file.open("w", newline="", encoding="utf-8") as fh:
+                writer = csv.writer(fh)
+                for r in rows:
+                    if len(r) < max_cols:
+                        r = r + [""] * (max_cols - len(r))
+                    writer.writerow(r)            
+            
+            all_rows[idx] = len(rows)
+            print(f"Wrote {len(rows)} rows to {csv_file}")
 
-        # normalize rows to equal length and write CSV
-        max_cols = max(len(r) for r in combined_rows)
-        csv_file = Path(csv_path)
-        with csv_file.open("w", newline="", encoding="utf-8") as fh:
-            writer = csv.writer(fh)
-            for r in combined_rows:
-                if len(r) < max_cols:
-                    r = r + [""] * (max_cols - len(r))
-                writer.writerow(r)
+        return all_rows
 
-        print(f"Wrote {len(combined_rows)} rows to {csv_file}")
+    def get_stratagems(self):
+        Collector = DataCollector("https://helldivers.wiki.gg/wiki/Stratagems", parse_html=True)
+        soup = Collector.fetch_data()
+        all_rows = Collector.parser(soup)
+        return all_rows
 
-
-Collector = DataCollector("https://helldivers.wiki.gg/wiki/Stratagems", parse_html=True)
-soup = Collector.fetch_data()
-Collector.parser(soup)
+        
+if __name__ == "__main__":
+    Collector = DataCollector("https://helldivers.wiki.gg/wiki/Stratagems", parse_html=True)
+    soup = Collector.fetch_data()
+    Collector.parser(soup)
 # print(f"{str(soup)[:30000]}")
