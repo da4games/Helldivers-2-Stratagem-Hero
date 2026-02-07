@@ -3,6 +3,7 @@ from key_reader import NonBlockingKeyReader
 import os
 from rich.console import Console
 import random
+import pandas as pd
 
 
 console = Console()
@@ -37,39 +38,55 @@ class stratagemHero():
         self.total_rows = 0
         for count in all_rows.values():
             self.total_rows += count
+            
+        self.stratagems_df = pd.read_csv(self.stratagems_directory, header=None)
+        self.mission_df = pd.read_csv(self.mission_directory, header=None)
         
         console.print(f"stratagemHero initialized with {all_rows} stratagems.")
     
-    def get_stratagem_table_entry_table_entry(self, index, column_name: str):
-        if index <= self.total_rows:
-            if index <= self.all_rows[0]:
-                with open(self.stratagems_directory, "r", encoding="utf-8") as f:
-                    lines = f.readlines()
-                    if index < len(lines):
-                        row = lines[index].strip()
-                        column_index = self.column_names[column_name]
-                        return row.split(",")[column_index]
-            
-            elif index > self.all_rows[0]:
-                with open(self.mission_directory, "r", encoding="utf-8") as f:
-                    lines = f.readlines()
-                    if index - self.all_rows[0] < len(lines):
-                        row = lines[index - self.all_rows[0]].strip()
-                        column_index = self.mission_column_names[column_name] if not column_name == "Department" else self.mission_column_names["Type"]
-                        return row.split(",")[column_index]
+    def get_stratagem_table_entry(self, index, column_name: str):
+        index += 1  # Adjust for header row in CSV files
+        if index > self.total_rows:
+            return None
 
-        return "Index out of range"
+        # Stratagems CSV
+        if index <= self.all_rows[0]:
+            if index < len(self.stratagems_df):
+                col_idx = self.column_names[column_name]
+                return self.stratagems_df.iloc[index, col_idx]
+
+        # Mission CSV
+        else:
+            mission_index = index - self.all_rows[0]
+            if mission_index < len(self.mission_df):
+                col_idx = (
+                    self.mission_column_names["Type"]
+                    if column_name == "Department"
+                    else self.mission_column_names[column_name]
+                )
+                return self.mission_df.iloc[mission_index, col_idx]
+
+        return None
     
             
     def validate_stratagem_codes(self):
+        codes = []
         # check if any index returns "None", an error or the header of the CSV file
         for i in range(self.total_rows):
-            data = self.get_stratagem_table_entry_table_entry(i, "Stratagem Codes")
+            data = self.get_stratagem_table_entry(i, "Stratagem Codes")
             
             if not "Stratagem" in str(data):
                 console.print(f"Stratagem code at index {i}: {data}")
+                console.print("This is likely an issue with the csv file or the parsing process. Please check the CSV files and ensure they are formatted correctly.")
+            elif "Codes" in str(data):
+                console.print(f"Stratagem code at index {i}: {data}")
+                console.print("This should NOT happen! This means the header row is being returned as data, which indicates an issue with the CSV file or the parsing process. Please check the CSV files and ensure they are formatted correctly.")
+            else:
+                codes.append(data)
         
         console.print(f"All {self.total_rows} stratagem codes validated!")
+        #for idx, code in enumerate(codes):
+        #    console.print(f"Index {idx}: {code}")
         # This means we now have all stratagems available by indexes from 0 to total_rows and are ignoring the header correctly.
     
     
@@ -104,7 +121,9 @@ class stratagemHero():
     def parse_stratagem_code(self, index):
         arrow_code = ""
         normal_code = []
-        code = self.get_stratagem_table_entry_table_entry(index, "Stratagem Codes")
+        code = self.get_stratagem_table_entry(index, "Stratagem Codes")
+        code = str(code) if code is not None else ""
+        
         for part in code.split("|"):    
             match part.strip():
                 case _ if "Up" in part:
@@ -124,11 +143,11 @@ class stratagemHero():
     
     def run(self):
         os.system('cls' if os.name == 'nt' else 'clear')
-        stratagem = random.randint(0, self.total_rows - 1)
+        stratagem = random.randint(0, self.total_rows - 1)       
         
         current_code_index = 0
         arrow_code, normal_code = self.parse_stratagem_code(stratagem)
-        console.print(f"{self.get_stratagem_table_entry_table_entry(stratagem, 'Stratagem')}", highlight=False)
+        console.print(f"{self.get_stratagem_table_entry(stratagem, 'Stratagem')}", highlight=False)
         prefix = arrow_code[:current_code_index]
         rest = arrow_code[current_code_index:]
         spaced_prefix = " ".join(list(prefix)) if prefix else ""
@@ -174,7 +193,7 @@ class stratagemHero():
                 
                 if update:
                     os.system('cls' if os.name == 'nt' else 'clear')
-                    console.print(self.get_stratagem_table_entry_table_entry(stratagem, "Stratagem"), highlight=False)
+                    console.print(self.get_stratagem_table_entry(stratagem, "Stratagem"), highlight=False)
                     # Print with spaces between each arrow in a single call.
                     # Split the string into characters and join with spaces so
                     # multi-arrow strings display as: 🡄 🡅 🡆 🡇
@@ -199,7 +218,7 @@ if __name__ == "__main__":
     game = stratagemHero(all_rows)
     console.print("Game class initialised!")
     
-    game.validate_stratagem_codes()    
+    game.validate_stratagem_codes() 
     console.print("Game loaded correctly!")
     
     os.system('pause')

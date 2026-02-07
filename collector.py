@@ -111,7 +111,7 @@ class DataCollector:
                         if rowspan > 1:
                             pending[col + i] = [cell_text, rowspan - 1]
                     col += colspan
-
+    
                 while consume_pending_at(col):
                     col += 1
 
