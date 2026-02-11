@@ -36,7 +36,7 @@ class DataCollector:
             print(f"Error fetching data: {e}")
             return None
 
-    def parser(self, soup, csv_path: str = "stratagems.csv"):
+    def parser(self, soup, csv_path: str = "recources/codes/stratagems.csv"):
         if soup is None:
             return {}
 
@@ -122,7 +122,7 @@ class DataCollector:
         # Map table indices to output filenames
         table_filenames = {
             0: csv_path,  # First table uses the provided csv_path
-            1: "mission_stratagems.csv",  # Second table goes here
+            1: "recources/codes/mission_stratagems.csv",  # Second table goes here
         }
         
         all_rows = {}

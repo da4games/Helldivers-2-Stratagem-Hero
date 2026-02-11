@@ -12,8 +12,8 @@ console = Console()
 class stratagemHero():
     def __init__(self, all_rows):
         self.current_script_path = os.path.abspath(__file__)
-        self.stratagems_directory = os.path.join(os.path.dirname(self.current_script_path), "stratagems.csv")
-        self.mission_directory = os.path.join(os.path.dirname(self.current_script_path), "mission_stratagems.csv")
+        self.stratagems_directory = os.path.join(os.path.dirname(self.current_script_path), "recources/codes/stratagems.csv")
+        self.mission_directory = os.path.join(os.path.dirname(self.current_script_path), "recources/codes/mission_stratagems.csv")
         self.all_rows = all_rows
         
         self.column_names = {
