@@ -1,5 +1,5 @@
 from collector import DataCollector
-from key_reader import NonBlockingKeyReader
+from key_reader import getch
 import os
 from rich.console import Console
 import random
@@ -125,6 +125,7 @@ class stratagemHero():
         self.mission_df = pd.read_csv(self.mission_directory, header=None)
         
         console.print(f"stratagemHero initialized with {all_rows} stratagems.")
+   
     
     def get_stratagem_table_entry(self, index, column_name: str):
         index += 1  # Adjust for header row in CSV files
@@ -237,55 +238,56 @@ class stratagemHero():
         sep = " " if spaced_prefix and spaced_rest else ""
         console.print(f"[yellow]{spaced_prefix}[/yellow]{sep}{spaced_rest}")
         
-        with NonBlockingKeyReader() as reader:
-            while current_code_index <= len(arrow_code) - 1:
-                update = False
-                # Check if it's a key press event with a valid scan code
-                input = reader.read_key()
-                if input:
-                    key = input
-                    
-                    if key == 'DOWN' and normal_code[current_code_index] == "DOWN":
-                        current_code_index += 1
-                        update = True
-                    elif key == 'UP' and normal_code[current_code_index] == "UP":
-                        current_code_index += 1
-                        update = True
-                    elif key == 'RIGHT' and normal_code[current_code_index] == "RIGHT":
-                        current_code_index += 1
-                        update = True
-                    elif key == 'LEFT' and normal_code[current_code_index] == "LEFT":
-                        current_code_index += 1
-                        update = True
-                    elif key == 'w' and normal_code[current_code_index] == "UP":
-                        current_code_index += 1
-                        update = True
-                    elif key == 'a' and normal_code[current_code_index] == "LEFT":
-                        current_code_index += 1
-                        update = True
-                    elif key == 's' and normal_code[current_code_index] == "DOWN":
-                        current_code_index += 1
-                        update = True
-                    elif key == 'd' and normal_code[current_code_index] == "RIGHT":
-                        current_code_index += 1
-                        update = True
-                    else:
-                        print(f"Pressed key: {repr(key)} does not match expected input for current code index {current_code_index}. Expected: {repr(normal_code[current_code_index])}")
-                        continue
+        while current_code_index <= len(arrow_code) - 1:
+            update = False
+            # Check if it's a key press event with a valid scan code
+            input = getch()
+            if input:
+                key = input
+                if key == '\x03':  # Ctrl-C
+                    raise KeyboardInterrupt
                 
-                if update:
-                    os.system('cls' if os.name == 'nt' else 'clear')
-                    console.print(self.get_stratagem_table_entry(stratagem, "Stratagem"), highlight=False)
-                    # Print with spaces between each arrow in a single call.
-                    # Split the string into characters and join with spaces so
-                    # multi-arrow strings display as: 🡄 🡅 🡆 🡇
-                    prefix = arrow_code[:current_code_index]
-                    rest = arrow_code[current_code_index:]
-                    spaced_prefix = " ".join(list(prefix)) if prefix else ""
-                    spaced_rest = " ".join(list(rest)) if rest else ""
-                    # If both parts exist, ensure there's a single separator.
-                    sep = " " if spaced_prefix and spaced_rest else ""
-                    console.print(f"[yellow]{spaced_prefix}[/yellow]{sep}{spaced_rest}")
+                if key == 'down' and normal_code[current_code_index] == "DOWN":
+                    current_code_index += 1
+                    update = True
+                elif key == 'up' and normal_code[current_code_index] == "UP":
+                    current_code_index += 1
+                    update = True
+                elif key == 'right' and normal_code[current_code_index] == "RIGHT":
+                    current_code_index += 1
+                    update = True
+                elif key == 'left' and normal_code[current_code_index] == "LEFT":
+                    current_code_index += 1
+                    update = True
+                elif key == 'w' and normal_code[current_code_index] == "UP":
+                    current_code_index += 1
+                    update = True
+                elif key == 'a' and normal_code[current_code_index] == "LEFT":
+                    current_code_index += 1
+                    update = True
+                elif key == 's' and normal_code[current_code_index] == "DOWN":
+                    current_code_index += 1
+                    update = True
+                elif key == 'd' and normal_code[current_code_index] == "RIGHT":
+                    current_code_index += 1
+                    update = True
+                else:
+                    print(f"Pressed key: {repr(key)} does not match expected input for current code index {current_code_index}. Expected: {repr(normal_code[current_code_index])}")
+                    continue
+            
+            if update:
+                os.system('cls' if os.name == 'nt' else 'clear')
+                console.print(self.get_stratagem_table_entry(stratagem, "Stratagem"), highlight=False)
+                # Print with spaces between each arrow in a single call.
+                # Split the string into characters and join with spaces so
+                # multi-arrow strings display as: 🡄 🡅 🡆 🡇
+                prefix = arrow_code[:current_code_index]
+                rest = arrow_code[current_code_index:]
+                spaced_prefix = " ".join(list(prefix)) if prefix else ""
+                spaced_rest = " ".join(list(rest)) if rest else ""
+                # If both parts exist, ensure there's a single separator.
+                sep = " " if spaced_prefix and spaced_rest else ""
+                console.print(f"[yellow]{spaced_prefix}[/yellow]{sep}{spaced_rest}")
     
 
 if __name__ == "__main__":
