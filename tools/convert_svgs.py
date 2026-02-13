@@ -7,7 +7,6 @@ Requirements:
     - The script will automatically detect Inkscape on Windows, Linux, and macOS
 """
 
-import os
 from pathlib import Path
 import subprocess
 import sys
@@ -124,7 +123,7 @@ def main():
     
     # Define paths
     script_dir = Path(__file__).parent.parent
-    icons_dir = script_dir / 'resources' / 'stratagem_icons'
+    icons_dir = script_dir / 'recources' / 'stratagem_icons'
     cache_dir = script_dir / '.svg_cache'
     
     # Create .svg_cache directory if it doesn't exist
@@ -136,7 +135,7 @@ def main():
     svg_files = list(icons_dir.glob('*.svg'))
     
     if not svg_files:
-        print("No SVG files found in stratagem_icons directory")
+        print(f"No SVG files found in stratagem_icons directory {icons_dir}")
         return
     
     print(f"Found {len(svg_files)} SVG files to convert\n")

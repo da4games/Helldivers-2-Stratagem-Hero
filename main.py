@@ -6,14 +6,13 @@ import random
 import pandas as pd
 import pygame
 import sys
-from pathlib import Path
 
 # Add tools directory to path for imports
 tools_dir = os.path.join(os.path.dirname(__file__), "tools")
 if tools_dir not in sys.path:
     sys.path.insert(0, tools_dir)
 
-from convert_svgs import find_inkscape, convert_svg_to_png
+from tools.convert_svgs import find_inkscape, convert_svg_to_png
 
 
 console = Console()
