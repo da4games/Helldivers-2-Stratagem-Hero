@@ -88,7 +88,7 @@ class DataCollector:
             print(f"Error fetching data: {e}")
             return None
 
-    def parser(self, soup, csv_path: str = "recources/codes/stratagems.csv"):
+    def parser(self, soup, csv_path: str = "resources/codes/stratagems.csv"):
         if soup is None:
             return {}
 
@@ -198,7 +198,7 @@ class DataCollector:
         # Map table indices to output filenames
         table_filenames = {
             0: csv_path,  # First table uses the provided csv_path
-            1: "recources/codes/mission_stratagems.csv",  # Second table goes here
+            1: "resources/codes/mission_stratagems.csv",  # Second table goes here
         }
 
         all_rows = {}
@@ -232,15 +232,15 @@ class DataCollector:
     def download_images(self, base_wiki_url="https://helldivers.wiki.gg"):
         """
         Download images that were collected during parsing from the tables.
-        Saves arrow images to recources/arrows/ and icon images to recources/stratagem_icons/
+        Saves arrow images to resources/arrows/ and icon images to resources/stratagem_icons/
         """
         if not self.collected_images:
             print("No images collected from tables to download")
             return
 
         # Create directories if they don't exist
-        Path("recources/arrows").mkdir(parents=True, exist_ok=True)
-        Path("recources/stratagem_icons").mkdir(parents=True, exist_ok=True)
+        Path("resources/arrows").mkdir(parents=True, exist_ok=True)
+        Path("resources/stratagem_icons").mkdir(parents=True, exist_ok=True)
 
         for image_data in self.collected_images:
             alt_text = image_data.get("alt", "").strip()
@@ -254,14 +254,14 @@ class DataCollector:
                 arrow_term in alt_text.lower()
                 for arrow_term in ["arrow", "strategem code"]
             ):
-                folder = "recources/arrows"
+                folder = "resources/arrows"
             elif any(
                 icon_term in alt_text.lower() for icon_term in ["icon", "stratagem"]
             ):
-                folder = "recources/stratagem_icons"
+                folder = "resources/stratagem_icons"
             else:
                 # Default to stratagem_icons for ambiguous cases
-                folder = "recources/stratagem_icons"
+                folder = "resources/stratagem_icons"
 
             # Construct full URL if src is relative
             if src.startswith("/"):

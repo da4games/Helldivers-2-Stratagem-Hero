@@ -34,7 +34,7 @@ def convert_svg_to_png(svg_path, output_path, width=200, height=200):
 def main():
     # Define paths
     script_dir = Path(__file__).parent.parent
-    icons_dir = script_dir / 'recources' / 'stratagem_icons'
+    icons_dir = script_dir / 'resources' / 'stratagem_icons'
     cache_dir = script_dir / '.svg_cache'
     
     # Create .svg_cache directory if it doesn't exist
