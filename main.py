@@ -23,9 +23,9 @@ class ImageLoader:
         """
 
         stratagem_icons_dir = os.path.join(
-            os.path.dirname(__file__), "recources", "stratagem_icons"
+            os.path.dirname(__file__), "resources", "stratagem_icons"
         )
-        arrows_dir = os.path.join(os.path.dirname(__file__), "recources", "arrows")
+        arrows_dir = os.path.join(os.path.dirname(__file__), "resources", "arrows")
         cache_dir = os.path.join(os.path.dirname(__file__), ".svg_cache")
 
         self.search_dirs = search_dirs or [stratagem_icons_dir, arrows_dir]
@@ -99,18 +99,18 @@ class stratagemHero:
     def __init__(self, all_rows):
         self.current_script_path = os.path.abspath(__file__)
         self.stratagems_directory = os.path.join(
-            os.path.dirname(self.current_script_path), "recources/codes/stratagems.csv"
+            os.path.dirname(self.current_script_path), "resources/codes/stratagems.csv"
         )
         self.mission_directory = os.path.join(
             os.path.dirname(self.current_script_path),
-            "recources/codes/mission_stratagems.csv",
+            "resources/codes/mission_stratagems.csv",
         )
 
         # Get paths to resource directories
         self.stratagem_icons_dir = os.path.join(
-            os.path.dirname(__file__), "recources", "stratagem_icons"
+            os.path.dirname(__file__), "resources", "stratagem_icons"
         )
-        self.arrows_dir = os.path.join(os.path.dirname(__file__), "recources", "arrows")
+        self.arrows_dir = os.path.join(os.path.dirname(__file__), "resources", "arrows")
         self.cache_dir = os.path.join(os.path.dirname(__file__), ".svg_cache")
 
         self.all_rows = all_rows
