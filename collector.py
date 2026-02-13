@@ -1,12 +1,64 @@
 import requests
 import csv
 from pathlib import Path
+import os
+import time
 
 
 class DataCollector:
     def __init__(self, base_url, parse_html=True):
         self.base_url = base_url
         self.parse_html = parse_html
+        self.collected_images = []  # Store images found in tables
+
+    @staticmethod
+    def normalize_quotes(text: str) -> str:
+        if not text:
+            return text
+        return text.replace('"', "“").replace("'", "’")
+
+    @staticmethod
+    def sanitize_filename(name: str) -> str:
+        if not name:
+            return name
+        # Replace invalid Windows filename characters
+        invalid_chars = '<>:"/\\|?*'
+        translation_table = str.maketrans({ch: "_" for ch in invalid_chars})
+        name = name.translate(translation_table)
+        # Remove control characters
+        name = "".join(ch for ch in name if ch.isprintable())
+        # Strip trailing dots/spaces (invalid on Windows)
+        name = name.rstrip(" .")
+
+        # Avoid reserved device names on Windows
+        reserved = {
+            "CON",
+            "PRN",
+            "AUX",
+            "NUL",
+            *(f"COM{i}" for i in range(1, 10)),
+            *(f"LPT{i}" for i in range(1, 10)),
+        }
+        if name.upper() in reserved:
+            name = f"{name}_"
+        return name
+
+    @staticmethod
+    def get_extension_from_src(src: str) -> str:
+        if not src:
+            return ".png"
+        url_path = src.split("?")[0]
+        tail = url_path.split("/")[-1]
+        if "." in tail:
+            return "." + tail.split(".")[-1]
+        return ".png"
+
+    def ensure_extension(self, name: str, src: str) -> str:
+        if not name:
+            return name
+        if Path(name).suffix:
+            return name
+        return name + self.get_extension_from_src(src)
 
     def fetch_data(self):
         try:
@@ -36,7 +88,7 @@ class DataCollector:
             print(f"Error fetching data: {e}")
             return None
 
-    def parser(self, soup, csv_path: str = "stratagems.csv"):
+    def parser(self, soup, csv_path: str = "resources/codes/stratagems.csv"):
         if soup is None:
             return {}
 
@@ -92,16 +144,40 @@ class DataCollector:
                         imgs = cell.select("img")
 
                     if imgs:
-                        alts = [
-                            img.get("alt", "").strip()
-                            for img in imgs
-                            if img.has_attr("alt")
-                        ]
+                        alts = []
+                        for img in imgs:
+                            if not img.has_attr("alt"):
+                                continue
+                            alt_text = self.normalize_quotes(img.get("alt", "").strip())
+                            src_text = (
+                                img.get("src", "").strip()
+                                if img.has_attr("src")
+                                else ""
+                            )
+                            alt_text = self.ensure_extension(alt_text, src_text)
+                            alts.append(alt_text)
+                        # Collect image data for downloading
+                        for img in imgs:
+                            if img.has_attr("alt") and img.has_attr("src"):
+                                alt_text = self.normalize_quotes(
+                                    img.get("alt", "").strip()
+                                )
+                                alt_text = self.ensure_extension(
+                                    alt_text, img.get("src", "").strip()
+                                )
+                                self.collected_images.append(
+                                    {
+                                        "alt": alt_text,
+                                        "src": img.get("src", "").strip(),
+                                    }
+                                )
                         cell_text = (
                             " | ".join(alts) if alts else cell.get_text(" ", strip=True)
                         )
                     else:
                         cell_text = cell.get_text(" ", strip=True)
+
+                    cell_text = self.normalize_quotes(cell_text)
 
                     colspan = int(cell.get("colspan", 1))
                     rowspan = int(cell.get("rowspan", 1))
@@ -111,7 +187,7 @@ class DataCollector:
                         if rowspan > 1:
                             pending[col + i] = [cell_text, rowspan - 1]
                     col += colspan
-    
+
                 while consume_pending_at(col):
                     col += 1
 
@@ -122,9 +198,9 @@ class DataCollector:
         # Map table indices to output filenames
         table_filenames = {
             0: csv_path,  # First table uses the provided csv_path
-            1: "mission_stratagems.csv",  # Second table goes here
+            1: "resources/codes/mission_stratagems.csv",  # Second table goes here
         }
-        
+
         all_rows = {}
         for idx, table in enumerate(tables):
             rows = parse_table(table)
@@ -146,22 +222,130 @@ class DataCollector:
                 for r in rows:
                     if len(r) < max_cols:
                         r = r + [""] * (max_cols - len(r))
-                    writer.writerow(r)            
-            
+                    writer.writerow(r)
+
             all_rows[idx] = len(rows)
             print(f"Wrote {len(rows)} rows to {csv_file}")
 
         return all_rows
 
+    def download_images(self, base_wiki_url="https://helldivers.wiki.gg"):
+        """
+        Download images that were collected during parsing from the tables.
+        Saves arrow images to resources/arrows/ and icon images to resources/stratagem_icons/
+        """
+        if not self.collected_images:
+            print("No images collected from tables to download")
+            return
+
+        # Create directories if they don't exist
+        Path("resources/arrows").mkdir(parents=True, exist_ok=True)
+        Path("resources/stratagem_icons").mkdir(parents=True, exist_ok=True)
+
+        for image_data in self.collected_images:
+            alt_text = image_data.get("alt", "").strip()
+            src = image_data.get("src", "").strip()
+
+            if not alt_text or not src:
+                continue
+
+            # Determine which folder based on alt text
+            if any(
+                arrow_term in alt_text.lower()
+                for arrow_term in ["arrow", "strategem code"]
+            ):
+                folder = "resources/arrows"
+            elif any(
+                icon_term in alt_text.lower() for icon_term in ["icon", "stratagem"]
+            ):
+                folder = "resources/stratagem_icons"
+            else:
+                # Default to stratagem_icons for ambiguous cases
+                folder = "resources/stratagem_icons"
+
+            # Construct full URL if src is relative
+            if src.startswith("/"):
+                full_url = base_wiki_url + src
+            elif src.startswith("http"):
+                full_url = src
+            else:
+                full_url = base_wiki_url + "/" + src
+
+            # Create filename from alt text
+            filename = self.normalize_quotes(alt_text).replace(" ", "_")
+            filename = self.sanitize_filename(filename)
+
+            # Get file extension from URL
+            url_path = full_url.split("?")[0]  # Remove query parameters
+            if "." in url_path.split("/")[-1]:
+                ext = "." + url_path.split(".")[-1]
+            else:
+                ext = ".png"  # Default to png if no extension found
+
+            # Only add extension if filename doesn't already end with it
+            if not filename.lower().endswith(ext.lower()):
+                filename = filename + ext
+            filepath = Path(folder) / filename
+
+            # Skip if file already exists
+            if filepath.exists():
+                print(f"Image already exists: {filepath}")
+                continue
+
+            # Retry loop - keeps trying until successful
+            success = False
+            attempt = 0
+            while not success:
+                attempt += 1
+                try:
+                    if attempt == 1:
+                        print(f"Downloading {alt_text} from {full_url}")
+                    else:
+                        print(f"Downloading {alt_text} (attempt {attempt})")
+
+                    response = requests.get(full_url, timeout=10)
+                    response.raise_for_status()
+
+                    with open(filepath, "wb") as f:
+                        f.write(response.content)
+                    print(f"Saved: {filepath}")
+                    success = True
+
+                    # Add delay between requests to avoid rate limiting
+                    time.sleep(0.5)
+
+                except requests.HTTPError as e:
+                    if response.status_code == 429:
+                        print(
+                            f"Rate limited (429). Waiting 5 seconds before retrying..."
+                        )
+                        print("(If this takes too long, press Ctrl+C to terminate)")
+                        time.sleep(5)
+                    else:
+                        print(f"HTTP error downloading {full_url}: {e}")
+                        success = True  # Don't retry on non-429 HTTP errors
+                except requests.RequestException as e:
+                    print(f"Error downloading {full_url}: {e}")
+                    success = True  # Don't retry on other request errors
+                except Exception as e:
+                    print(f"Error saving {filepath}: {e}")
+                    success = True  # Don't retry on other errors
+
     def get_stratagems(self):
-        Collector = DataCollector("https://helldivers.wiki.gg/wiki/Stratagems", parse_html=True)
+        Collector = DataCollector(
+            "https://helldivers.wiki.gg/wiki/Stratagems", parse_html=True
+        )
         soup = Collector.fetch_data()
         all_rows = Collector.parser(soup)
+        Collector.download_images()
         return all_rows
 
-        
+
 if __name__ == "__main__":
-    Collector = DataCollector("https://helldivers.wiki.gg/wiki/Stratagems", parse_html=True)
+    Collector = DataCollector(
+        "https://helldivers.wiki.gg/wiki/Stratagems", parse_html=True
+    )
     soup = Collector.fetch_data()
     Collector.parser(soup)
+    Collector.download_images()
 # print(f"{str(soup)[:30000]}")
