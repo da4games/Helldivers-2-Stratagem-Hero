@@ -17,8 +17,8 @@ screen = pygame.display.set_mode((800, 600))
 pygame.display.set_caption("Image Display")
 
 # Get paths to resource directories
-stratagem_icons_dir = os.path.join(os.path.dirname(__file__), "resources", "stratagem_icons")
-arrows_dir = os.path.join(os.path.dirname(__file__), "resources", "arrows")
+stratagem_icons_dir = os.path.join(os.path.dirname(__file__), "recources", "stratagem_icons")
+arrows_dir = os.path.join(os.path.dirname(__file__), "recources", "arrows")
 cache_dir = os.path.join(os.path.dirname(__file__), ".svg_cache")
 
 
