@@ -11,6 +11,55 @@ class DataCollector:
         self.parse_html = parse_html
         self.collected_images = []  # Store images found in tables
 
+    @staticmethod
+    def normalize_quotes(text: str) -> str:
+        if not text:
+            return text
+        return text.replace('"', "“").replace("'", "’")
+
+    @staticmethod
+    def sanitize_filename(name: str) -> str:
+        if not name:
+            return name
+        # Replace invalid Windows filename characters
+        invalid_chars = '<>:"/\\|?*'
+        translation_table = str.maketrans({ch: "_" for ch in invalid_chars})
+        name = name.translate(translation_table)
+        # Remove control characters
+        name = "".join(ch for ch in name if ch.isprintable())
+        # Strip trailing dots/spaces (invalid on Windows)
+        name = name.rstrip(" .")
+
+        # Avoid reserved device names on Windows
+        reserved = {
+            "CON",
+            "PRN",
+            "AUX",
+            "NUL",
+            *(f"COM{i}" for i in range(1, 10)),
+            *(f"LPT{i}" for i in range(1, 10)),
+        }
+        if name.upper() in reserved:
+            name = f"{name}_"
+        return name
+
+    @staticmethod
+    def get_extension_from_src(src: str) -> str:
+        if not src:
+            return ".png"
+        url_path = src.split("?")[0]
+        tail = url_path.split("/")[-1]
+        if "." in tail:
+            return "." + tail.split(".")[-1]
+        return ".png"
+
+    def ensure_extension(self, name: str, src: str) -> str:
+        if not name:
+            return name
+        if Path(name).suffix:
+            return name
+        return name + self.get_extension_from_src(src)
+
     def fetch_data(self):
         try:
             response = requests.get(self.base_url)
@@ -95,23 +144,40 @@ class DataCollector:
                         imgs = cell.select("img")
 
                     if imgs:
-                        alts = [
-                            img.get("alt", "").strip()
-                            for img in imgs
-                            if img.has_attr("alt")
-                        ]
+                        alts = []
+                        for img in imgs:
+                            if not img.has_attr("alt"):
+                                continue
+                            alt_text = self.normalize_quotes(img.get("alt", "").strip())
+                            src_text = (
+                                img.get("src", "").strip()
+                                if img.has_attr("src")
+                                else ""
+                            )
+                            alt_text = self.ensure_extension(alt_text, src_text)
+                            alts.append(alt_text)
                         # Collect image data for downloading
                         for img in imgs:
                             if img.has_attr("alt") and img.has_attr("src"):
-                                self.collected_images.append({
-                                    "alt": img.get("alt", "").strip(),
-                                    "src": img.get("src", "").strip()
-                                })
+                                alt_text = self.normalize_quotes(
+                                    img.get("alt", "").strip()
+                                )
+                                alt_text = self.ensure_extension(
+                                    alt_text, img.get("src", "").strip()
+                                )
+                                self.collected_images.append(
+                                    {
+                                        "alt": alt_text,
+                                        "src": img.get("src", "").strip(),
+                                    }
+                                )
                         cell_text = (
                             " | ".join(alts) if alts else cell.get_text(" ", strip=True)
                         )
                     else:
                         cell_text = cell.get_text(" ", strip=True)
+
+                    cell_text = self.normalize_quotes(cell_text)
 
                     colspan = int(cell.get("colspan", 1))
                     rowspan = int(cell.get("rowspan", 1))
@@ -121,7 +187,7 @@ class DataCollector:
                         if rowspan > 1:
                             pending[col + i] = [cell_text, rowspan - 1]
                     col += colspan
-    
+
                 while consume_pending_at(col):
                     col += 1
 
@@ -134,7 +200,7 @@ class DataCollector:
             0: csv_path,  # First table uses the provided csv_path
             1: "recources/codes/mission_stratagems.csv",  # Second table goes here
         }
-        
+
         all_rows = {}
         for idx, table in enumerate(tables):
             rows = parse_table(table)
@@ -156,8 +222,8 @@ class DataCollector:
                 for r in rows:
                     if len(r) < max_cols:
                         r = r + [""] * (max_cols - len(r))
-                    writer.writerow(r)            
-            
+                    writer.writerow(r)
+
             all_rows[idx] = len(rows)
             print(f"Wrote {len(rows)} rows to {csv_file}")
 
@@ -184,9 +250,14 @@ class DataCollector:
                 continue
 
             # Determine which folder based on alt text
-            if any(arrow_term in alt_text.lower() for arrow_term in ["arrow", "strategem code"]):
+            if any(
+                arrow_term in alt_text.lower()
+                for arrow_term in ["arrow", "strategem code"]
+            ):
                 folder = "recources/arrows"
-            elif any(icon_term in alt_text.lower() for icon_term in ["icon", "stratagem"]):
+            elif any(
+                icon_term in alt_text.lower() for icon_term in ["icon", "stratagem"]
+            ):
                 folder = "recources/stratagem_icons"
             else:
                 # Default to stratagem_icons for ambiguous cases
@@ -200,9 +271,10 @@ class DataCollector:
             else:
                 full_url = base_wiki_url + "/" + src
 
-            # Create filename from alt text, removing special characters
-            filename = alt_text.replace(" ", "_")
-            
+            # Create filename from alt text
+            filename = self.normalize_quotes(alt_text).replace(" ", "_")
+            filename = self.sanitize_filename(filename)
+
             # Get file extension from URL
             url_path = full_url.split("?")[0]  # Remove query parameters
             if "." in url_path.split("/")[-1]:
@@ -230,21 +302,23 @@ class DataCollector:
                         print(f"Downloading {alt_text} from {full_url}")
                     else:
                         print(f"Downloading {alt_text} (attempt {attempt})")
-                    
+
                     response = requests.get(full_url, timeout=10)
                     response.raise_for_status()
-                    
+
                     with open(filepath, "wb") as f:
                         f.write(response.content)
                     print(f"Saved: {filepath}")
                     success = True
-                    
+
                     # Add delay between requests to avoid rate limiting
                     time.sleep(0.5)
-                    
+
                 except requests.HTTPError as e:
                     if response.status_code == 429:
-                        print(f"Rate limited (429). Waiting 5 seconds before retrying...")
+                        print(
+                            f"Rate limited (429). Waiting 5 seconds before retrying..."
+                        )
                         print("(If this takes too long, press Ctrl+C to terminate)")
                         time.sleep(5)
                     else:
@@ -258,15 +332,19 @@ class DataCollector:
                     success = True  # Don't retry on other errors
 
     def get_stratagems(self):
-        Collector = DataCollector("https://helldivers.wiki.gg/wiki/Stratagems", parse_html=True)
+        Collector = DataCollector(
+            "https://helldivers.wiki.gg/wiki/Stratagems", parse_html=True
+        )
         soup = Collector.fetch_data()
         all_rows = Collector.parser(soup)
         Collector.download_images()
         return all_rows
 
-        
+
 if __name__ == "__main__":
-    Collector = DataCollector("https://helldivers.wiki.gg/wiki/Stratagems", parse_html=True)
+    Collector = DataCollector(
+        "https://helldivers.wiki.gg/wiki/Stratagems", parse_html=True
+    )
     soup = Collector.fetch_data()
     Collector.parser(soup)
     Collector.download_images()
