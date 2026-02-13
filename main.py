@@ -5,7 +5,15 @@ from rich.console import Console
 import random
 import pandas as pd
 import pygame
-import subprocess
+import sys
+from pathlib import Path
+
+# Add tools directory to path for imports
+tools_dir = os.path.join(os.path.dirname(__file__), "tools")
+if tools_dir not in sys.path:
+    sys.path.insert(0, tools_dir)
+
+from convert_svgs import find_inkscape, convert_svg_to_png
 
 
 console = Console()
@@ -36,23 +44,15 @@ class ImageLoader:
             os.makedirs(self.cache_dir)
 
     def _convert_svg_to_png(self, svg_path):
-        """Convert SVG file to PNG and cache it"""
+        """Convert SVG file to PNG and cache it using shared converter"""
         svg_name = os.path.basename(svg_path)
         cache_file = os.path.join(self.cache_dir, svg_name.replace(".svg", ".png"))
 
         # Check if PNG is already cached
         if not os.path.exists(cache_file):
-            subprocess.run(
-                [
-                    r"C:\Program Files\Inkscape\bin\inkscape.exe",
-                    svg_path,
-                    "--export-type=png",
-                    f"--export-width=200",
-                    f"--export-height=200",
-                    f"--export-filename={cache_file}",
-                ],
-                check=True,
-            )
+            # Use the shared convert_svg_to_png function
+            # It will auto-detect Inkscape if inkscape_path is None
+            convert_svg_to_png(svg_path, cache_file, inkscape_path=None)
 
         return cache_file
 
