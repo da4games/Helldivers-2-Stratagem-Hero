@@ -34,7 +34,6 @@ class ImageLoader:
         """
         self.search_dirs = search_dirs or [stratagem_icons_dir, arrows_dir]
         self.cache_dir = cache_dir
-        self.inkscape_path = None  # Will be lazily initialized when needed
         
         # Create cache directory if it doesn't exist
         if not os.path.exists(self.cache_dir):
@@ -47,16 +46,9 @@ class ImageLoader:
         
         # Check if PNG is already cached
         if not os.path.exists(cache_file):
-            # Lazily find Inkscape on first conversion
-            if self.inkscape_path is None:
-                self.inkscape_path = find_inkscape()
-                if not self.inkscape_path:
-                    raise FileNotFoundError(
-                        "Inkscape not found. Please install Inkscape from https://inkscape.org/release/"
-                    )
-            
             # Use the shared convert_svg_to_png function
-            convert_svg_to_png(svg_path, cache_file, self.inkscape_path)
+            # It will auto-detect Inkscape if inkscape_path is None
+            convert_svg_to_png(svg_path, cache_file, inkscape_path=None)
         
         return cache_file
     
