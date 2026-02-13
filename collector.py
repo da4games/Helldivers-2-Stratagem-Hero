@@ -201,8 +201,7 @@ class DataCollector:
                 full_url = base_wiki_url + "/" + src
 
             # Create filename from alt text, removing special characters
-            filename = "".join(c if c.isalnum() or c in (' ', '_', '-') else '' for c in alt_text)
-            filename = filename.replace(" ", "_")
+            filename = alt_text.replace(" ", "_")
             
             # Get file extension from URL
             url_path = full_url.split("?")[0]  # Remove query parameters
@@ -211,7 +210,9 @@ class DataCollector:
             else:
                 ext = ".png"  # Default to png if no extension found
 
-            filename = filename + ext
+            # Only add extension if filename doesn't already end with it
+            if not filename.lower().endswith(ext.lower()):
+                filename = filename + ext
             filepath = Path(folder) / filename
 
             # Skip if file already exists

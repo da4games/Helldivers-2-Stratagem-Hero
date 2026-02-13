@@ -21,7 +21,6 @@ class ImageLoader:
         Args:
             search_dirs: List of directories to search for images. If None, uses default dirs.
         """
-        pygame.init()
         
         stratagem_icons_dir = os.path.join(os.path.dirname(__file__), "recources", "stratagem_icons")
         arrows_dir = os.path.join(os.path.dirname(__file__), "recources", "arrows")
@@ -96,6 +95,12 @@ class stratagemHero():
         self.current_script_path = os.path.abspath(__file__)
         self.stratagems_directory = os.path.join(os.path.dirname(self.current_script_path), "recources/codes/stratagems.csv")
         self.mission_directory = os.path.join(os.path.dirname(self.current_script_path), "recources/codes/mission_stratagems.csv")
+        
+        # Get paths to resource directories
+        self.stratagem_icons_dir = os.path.join(os.path.dirname(__file__), "recources", "stratagem_icons")
+        self.arrows_dir = os.path.join(os.path.dirname(__file__), "recources", "arrows")
+        self.cache_dir = os.path.join(os.path.dirname(__file__), ".svg_cache")
+        
         self.all_rows = all_rows
         
         self.column_names = {
@@ -123,6 +128,8 @@ class stratagemHero():
             
         self.stratagems_df = pd.read_csv(self.stratagems_directory, header=None)
         self.mission_df = pd.read_csv(self.mission_directory, header=None)
+        
+        self.search_dirs = [self.stratagem_icons_dir, self.arrows_dir]
         
         console.print(f"stratagemHero initialized with {all_rows} stratagems.")
    
@@ -207,6 +214,9 @@ class stratagemHero():
         code = self.get_stratagem_table_entry(index, "Stratagem Codes")
         code = str(code) if code is not None else ""
         
+        if not self.compatibility_mode:
+            raise AttributeError("Function 'get_compatibility_mode' must be called to set compatibility mode before parsing stratagem codes. This is because the parsing process depends on the compatibility mode to determine which arrow representations to use.")
+        
         for part in code.split("|"):    
             match part.strip():
                 case _ if "Up" in part:
@@ -224,70 +234,65 @@ class stratagemHero():
         return arrow_code, normal_code
     
     
-    def run(self):
-        os.system('cls' if os.name == 'nt' else 'clear')
-        stratagem = random.randint(0, self.total_rows - 1)       
+    def search_file(self, filename):
+        """Searches for the exact file name in the following hierachy:
+        1. Exact match
+        2. Substring match
+        3. Replaces spaces with underscores and matches the full file name.
+        (Good for matching stratagem icon alts with their svg file paths.
+        Also works for the arrows.)
         
-        current_code_index = 0
-        arrow_code, normal_code = self.parse_stratagem_code(stratagem)
-        console.print(f"{self.get_stratagem_table_entry(stratagem, 'Stratagem')}", highlight=False)
-        prefix = arrow_code[:current_code_index]
-        rest = arrow_code[current_code_index:]
-        spaced_prefix = " ".join(list(prefix)) if prefix else ""
-        spaced_rest = " ".join(list(rest)) if rest else ""
-        sep = " " if spaced_prefix and spaced_rest else ""
-        console.print(f"[yellow]{spaced_prefix}[/yellow]{sep}{spaced_rest}")
-        
-        while current_code_index <= len(arrow_code) - 1:
-            update = False
-            # Check if it's a key press event with a valid scan code
-            input = getch()
-            if input:
-                key = input
-                if key == '\x03':  # Ctrl-C
-                    raise KeyboardInterrupt
-                
-                if key == 'down' and normal_code[current_code_index] == "DOWN":
-                    current_code_index += 1
-                    update = True
-                elif key == 'up' and normal_code[current_code_index] == "UP":
-                    current_code_index += 1
-                    update = True
-                elif key == 'right' and normal_code[current_code_index] == "RIGHT":
-                    current_code_index += 1
-                    update = True
-                elif key == 'left' and normal_code[current_code_index] == "LEFT":
-                    current_code_index += 1
-                    update = True
-                elif key == 'w' and normal_code[current_code_index] == "UP":
-                    current_code_index += 1
-                    update = True
-                elif key == 'a' and normal_code[current_code_index] == "LEFT":
-                    current_code_index += 1
-                    update = True
-                elif key == 's' and normal_code[current_code_index] == "DOWN":
-                    current_code_index += 1
-                    update = True
-                elif key == 'd' and normal_code[current_code_index] == "RIGHT":
-                    current_code_index += 1
-                    update = True
-                else:
-                    print(f"Pressed key: {repr(key)} does not match expected input for current code index {current_code_index}. Expected: {repr(normal_code[current_code_index])}")
-                    continue
+        Returns the first match found."""
+        for directory in self.search_dirs:
+            # First try exact match
+            path = os.path.join(directory, filename)
+            if os.path.exists(path):
+                return path
             
-            if update:
-                os.system('cls' if os.name == 'nt' else 'clear')
-                console.print(self.get_stratagem_table_entry(stratagem, "Stratagem"), highlight=False)
-                # Print with spaces between each arrow in a single call.
-                # Split the string into characters and join with spaces so
-                # multi-arrow strings display as: 🡄 🡅 🡆 🡇
-                prefix = arrow_code[:current_code_index]
-                rest = arrow_code[current_code_index:]
-                spaced_prefix = " ".join(list(prefix)) if prefix else ""
-                spaced_rest = " ".join(list(rest)) if rest else ""
-                # If both parts exist, ensure there's a single separator.
-                sep = " " if spaced_prefix and spaced_rest else ""
-                console.print(f"[yellow]{spaced_prefix}[/yellow]{sep}{spaced_rest}")
+            # If not found, try substring match
+            for file in os.listdir(directory):
+                if filename in file:
+                    return os.path.join(directory, file)
+        
+            # If still not found, try replacing spaces with underscores and match full file name
+            modified_filename = filename.replace(" ", "_")
+            path = os.path.join(directory, modified_filename)
+            if os.path.exists(path):
+                return path
+        
+        raise FileNotFoundError(f"File '{filename}' and variant '{modified_filename}' not found in search directories with any matching strategy.")
+    
+    def run(self):
+        # os.system('cls' if os.name == 'nt' else 'clear')
+        stratagem = random.randint(0, self.total_rows - 1)
+        
+        # how do I get the pressed key in pygame
+        pygame.init()
+        screen = pygame.display.set_mode((1000, 600))
+        pygame.display.set_caption("Stratagem Hero - Press the correct keys in order!")
+        
+        loader = ImageLoader(search_dirs=[self.stratagem_icons_dir, self.arrows_dir])
+        
+        stratagem_icon_path = self.search_file(self.get_stratagem_table_entry(stratagem, "Icon"))
+        
+        stratagem_scaled = loader.load(stratagem_icon_path, size=(50, 50))
+        
+        running = True
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+
+            screen.fill((0, 0, 0))
+            screen.blit(stratagem_scaled, (50, 50))  # draw stratagem icon
+            
+            full_code = self.get_stratagem_table_entry(stratagem, "Stratagem Codes")
+            split_code = str(full_code).split(" | ")
+            for index, code in enumerate(split_code):
+                arrow_path = self.search_file(code)
+                arrow_scaled = loader.load(arrow_path, size=(50, 50))
+                screen.blit(arrow_scaled, (50 + index * 60, 150))  # draw arrow
+            pygame.display.flip()        
     
 
 if __name__ == "__main__":
@@ -306,8 +311,5 @@ if __name__ == "__main__":
     console.print("Game loaded correctly!")
     
     os.system('pause')
-    
-    os.system('cls' if os.name == 'nt' else 'clear')
-    game.get_compatibility_mode()
     
     game.run()
