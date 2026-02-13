@@ -63,7 +63,7 @@ class ImageLoader:
         Load and scale an image
         
         Args:
-            filename: Name of the image file (e.g., 'Stratagem_Arrow_Upsvg.svg')
+            filename: Name of the image file (e.g., 'Stratagem_Arrow_Up.svg')
             size: Tuple (width, height) to scale to. If provided, overrides scale.
             scale: Float multiplier for scaling (e.g., 2.0 for 2x). Ignored if size is provided.
         
