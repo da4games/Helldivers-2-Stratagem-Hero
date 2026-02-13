@@ -62,17 +62,28 @@ def find_inkscape():
     
     return None
 
-def convert_svg_to_png(svg_path, output_path, inkscape_path, width=200, height=200):
+def convert_svg_to_png(svg_path, output_path, inkscape_path=None, width=200, height=200):
     """
     Convert an SVG file to PNG format using Inkscape
     
     Args:
         svg_path: Path to the SVG file
         output_path: Path where the PNG should be saved
-        inkscape_path: Path to Inkscape executable
+        inkscape_path: Path to Inkscape executable (if None, will auto-detect)
         width: Output width in pixels (default: 200)
         height: Output height in pixels (default: 200)
+    
+    Returns:
+        True if conversion succeeded, False otherwise
     """
+    # Auto-detect Inkscape if path not provided
+    if inkscape_path is None:
+        inkscape_path = find_inkscape()
+        if not inkscape_path:
+            raise FileNotFoundError(
+                "Inkscape not found. Please install Inkscape from https://inkscape.org/release/"
+            )
+    
     try:
         subprocess.run([
             inkscape_path,
@@ -82,10 +93,10 @@ def convert_svg_to_png(svg_path, output_path, inkscape_path, width=200, height=2
             f"--export-height={height}",
             f"--export-filename={output_path}"
         ], check=True, capture_output=True)
-        print(f"✓ Converted: {svg_path.name} -> {output_path.name}")
+        print(f"✓ Converted: {Path(svg_path).name} -> {Path(output_path).name}")
         return True
     except Exception as e:
-        print(f"✗ Failed to convert {svg_path.name}: {e}")
+        print(f"✗ Failed to convert {Path(svg_path).name}: {e}")
         return False
 
 def main():
