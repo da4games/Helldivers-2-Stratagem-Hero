@@ -11,3 +11,7 @@
 
 ## Credits:
 - used getch() funcrion from https://github.com/knosmos/cmdpxl/blob/main/cmdpxl/terminal_io.py
+
+## Things to look into:
+- https://github.com/drizzer14/stratagem-hero
+- https://github.com/EclipsedMango/stratagem-hero/tree/main/SoundEffects

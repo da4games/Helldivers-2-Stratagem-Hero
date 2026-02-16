@@ -57,7 +57,7 @@ class ImageLoader:
                     raise FileNotFoundError(
                         "Inkscape not found. Please install Inkscape from https://inkscape.org/release/"
                     )
-            
+
             # Use the shared convert_svg_to_png function
             convert_svg_to_png(svg_path, cache_file, self.inkscape_path)
 
@@ -285,7 +285,8 @@ class stratagemHero:
 
     def run(self):
         # os.system('cls' if os.name == 'nt' else 'clear')
-        stratagem = random.randint(0, self.total_rows - 1)
+        stratagem = 0
+        stratagems = []
         completed_indices = 0
         split_code = ""
         arrow_code = ""
@@ -311,14 +312,33 @@ class stratagemHero:
             tinted.fill(color, special_flags=pygame.BLEND_RGBA_MULT)
             return tinted
 
+        stratagem_icons = []  # Store loaded icons for display
+
         def load_new_stratagem():
-            nonlocal stratagem, stratagem_scaled, completed_indices, update, split_code, arrow_code, normal_code
-            stratagem = random.randint(0, self.total_rows - 1)
+            nonlocal stratagem, stratagems, stratagem_scaled, completed_indices, update, split_code, arrow_code, normal_code, stratagem_icons
+            for _ in range(6 - len(stratagems)):
+                # ensure we have 6 stratagems backed up
+                stratagems.append(random.randint(0, self.total_rows - 1))
+
+            stratagem = stratagems[0]
+
             completed_indices = 0
-            stratagem_icon_path = self.search_file(
-                self.get_stratagem_table_entry(stratagem, "Icon")
+
+            # Load all stratagem icons
+            stratagem_icons = []
+            # Load first icon (100x100)
+            first_icon_path = self.search_file(
+                self.get_stratagem_table_entry(stratagems[0], "Icon")
             )
-            stratagem_scaled = loader.load(stratagem_icon_path, size=(50, 50))
+            stratagem_icons.append(loader.load(first_icon_path, size=(100, 100)))
+
+            # Load remaining 5 icons (50x50)
+            for i in range(1, min(6, len(stratagems))):
+                icon_path = self.search_file(
+                    self.get_stratagem_table_entry(stratagems[i], "Icon")
+                )
+                stratagem_icons.append(loader.load(icon_path, size=(50, 50)))
+
             full_code = self.get_stratagem_table_entry(stratagem, "Stratagem Codes")
             split_code = str(full_code).split(" | ")
             update = True
@@ -334,10 +354,15 @@ class stratagemHero:
                     running = False
 
                 if event.type == pygame.KEYDOWN:
-                    if pygame.key.name(event.key) == normal_code[completed_indices] or pygame.key.name(event.key) == key_lookup.get(normal_code[completed_indices], ""):
+                    if pygame.key.name(event.key) == normal_code[
+                        completed_indices
+                    ] or pygame.key.name(event.key) == key_lookup.get(
+                        normal_code[completed_indices], ""
+                    ):
                         completed_indices += 1
                         update = True  # Trigger screen update to show progress
                         if completed_indices >= len(normal_code):
+                            stratagems.pop(0)
                             load_new_stratagem()  # Load a new stratagem when the current one is complete
                     else:
                         print(
@@ -346,8 +371,51 @@ class stratagemHero:
 
             if update:
                 screen.fill((0, 0, 0))
-                icon_x = (screen.get_width() - stratagem_scaled.get_width()) // 2
-                screen.blit(stratagem_scaled, (icon_x, 50))  # draw stratagem icon
+
+                # Display the 6 stratagem icons in a horizontal row
+                icon_size = 100
+                border_padding = 10
+                border_size = icon_size + (border_padding * 2)
+                remaining_icon_size = 50
+                icon_spacing = 10
+
+                # Calculate total width: first icon with border + spacing + 5 remaining icons
+                total_width = (
+                    border_size
+                    + icon_spacing
+                    + (5 * remaining_icon_size)
+                    + (4 * icon_spacing)
+                )
+                start_x = (screen.get_width() - total_width) // 2
+                icon_y = 125
+
+                # Draw yellow border for first icon
+                pygame.draw.rect(
+                    screen,
+                    (255, 255, 0),
+                    (
+                        start_x - border_padding,
+                        icon_y - border_padding,
+                        border_size,
+                        border_size,
+                    ),
+                    3,
+                )
+
+                # Blit the first icon
+                screen.blit(stratagem_icons[0], (start_x, icon_y))
+
+                # Display the remaining 5 stratagems horizontally in order after the first one
+                remaining_y = (
+                    icon_y + (icon_size - remaining_icon_size) // 2
+                )  # Center vertically to first icon
+                remaining_start_x = start_x + border_size + icon_spacing
+
+                for i in range(1, min(6, len(stratagems))):
+                    x = remaining_start_x + (i - 1) * (
+                        remaining_icon_size + icon_spacing
+                    )
+                    screen.blit(stratagem_icons[i], (x, remaining_y))
 
                 arrow_size = 30
                 arrow_spacing = 10
@@ -363,14 +431,14 @@ class stratagemHero:
                     if index < completed_indices:
                         arrow_scaled = tint_surface(arrow_scaled, (255, 255, 0, 255))
                     x = start_x + index * (arrow_size + arrow_spacing)
-                    screen.blit(arrow_scaled, (x, 200))  # draw arrow
+                    screen.blit(arrow_scaled, (x, 300))  # draw arrow
 
                 # how do I display the name of the stratagem between the icon and the arrows
                 font = pygame.font.SysFont(None, 36)
                 stratagem_name = self.get_stratagem_table_entry(stratagem, "Stratagem")
                 text_surface = font.render(str(stratagem_name), True, (255, 255, 255))
                 text_x = (screen.get_width() - text_surface.get_width()) // 2
-                screen.blit(text_surface, (text_x, 150))
+                screen.blit(text_surface, (text_x, 250))
 
                 pygame.display.flip()
                 update = False
