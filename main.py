@@ -348,12 +348,14 @@ class stratagemHero:
 
         running = True
         update = True
+        incorrect_input = False
         while running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
 
                 if event.type == pygame.KEYDOWN:
+                    incorrect_input = False
                     if pygame.key.name(event.key) == normal_code[
                         completed_indices
                     ] or pygame.key.name(event.key) == key_lookup.get(
@@ -368,8 +370,11 @@ class stratagemHero:
                         print(
                             f"Incorrect key! Expected '{normal_code[completed_indices]}' but got '{pygame.key.name(event.key)}'. Try again."
                         )
-
-            if update:
+                        incorrect_input = True
+                        completed_indices = 0
+                        update = True
+                
+            def update_screen(incorrect: bool = False):
                 screen.fill((0, 0, 0))
 
                 # Display the 6 stratagem icons in a horizontal row
@@ -428,8 +433,12 @@ class stratagemHero:
                     arrow_scaled = loader.load(
                         arrow_path, size=(arrow_size, arrow_size)
                     )
-                    if index < completed_indices:
+                    if incorrect:
+                        arrow_scaled = tint_surface(arrow_scaled, (255, 0, 0, 255))
+                        
+                    elif index < completed_indices:
                         arrow_scaled = tint_surface(arrow_scaled, (255, 255, 0, 255))
+                        
                     x = start_x + index * (arrow_size + arrow_spacing)
                     screen.blit(arrow_scaled, (x, 300))  # draw arrow
 
@@ -441,8 +450,13 @@ class stratagemHero:
                 screen.blit(text_surface, (text_x, 250))
 
                 pygame.display.flip()
-                update = False
 
+            if update:
+                update_screen(incorrect_input)
+                update = False
+                if incorrect_input:
+                    pygame.time.delay(250)  # Brief pause to show red arrows on incorrect input
+                    update_screen()  # Refresh screen to remove red arrows after delay
 
 if __name__ == "__main__":
     console.print("Loading stratagems from the wiki . . .")
