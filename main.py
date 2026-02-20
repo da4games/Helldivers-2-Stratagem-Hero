@@ -346,9 +346,10 @@ class stratagemHero:
 
         load_new_stratagem()  # Load the initial stratagem
 
-        running = True
-        update = True
-        incorrect_input = False
+        running: bool = True
+        update: bool = True
+        incorrect_input: bool = False
+        score: int = 0
         while running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -364,6 +365,7 @@ class stratagemHero:
                         completed_indices += 1
                         update = True  # Trigger screen update to show progress
                         if completed_indices >= len(normal_code):
+                            score += len(normal_code) * 5
                             stratagems.pop(0)
                             load_new_stratagem()  # Load a new stratagem when the current one is complete
                     else:
@@ -457,6 +459,9 @@ class stratagemHero:
                 if incorrect_input:
                     pygame.time.delay(250)  # Brief pause to show red arrows on incorrect input
                     update_screen()  # Refresh screen to remove red arrows after delay
+        
+        print(f"Your final score: {score}")
+        pygame.quit()
 
 if __name__ == "__main__":
     console.print("Loading stratagems from the wiki . . .")
