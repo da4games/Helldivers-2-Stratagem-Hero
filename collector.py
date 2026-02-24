@@ -102,12 +102,6 @@ class DataCollector:
                 print("Warning: unable to parse HTML string")
                 return {}
 
-        # target all wikitables by class and merge them
-        tables = soup.select(".wikitable")
-        if not tables:
-            print("No matching table found")
-            return {}
-
         def parse_table(table):
             rows = []
             pending = {}  # col_index -> [value, remaining_rows]
@@ -195,28 +189,55 @@ class DataCollector:
 
             return rows
 
-        # Map table indices to output filenames
-        table_filenames = {
-            0: csv_path,  # First table uses the provided csv_path
-            1: "recources/codes/mission_stratagems.csv",  # Second table goes here
+        # Find all h3 tags and their following tables
+        # Only include the 10 main stratagem categories
+        valid_categories = {
+            "Support Weapons",
+            "Orbital Strikes",
+            "Eagle Strikes",
+            "Emplacements",
+            "Sentries",
+            "Backpacks",
+            "Vehicles",
+            "Ship",
+            "Objective",
+            "Other",
         }
 
+        h3_tags = soup.find_all("h3")
         all_rows = {}
-        for idx, table in enumerate(tables):
+
+        for h3_tag in h3_tags:
+            # Extract text from h3 tag
+            h3_text = h3_tag.get_text(strip=True)
+
+            if not h3_text or h3_text not in valid_categories:
+                continue
+
+            # Find the next wikitable after this h3
+            table = h3_tag.find_next("table", class_="wikitable")
+
+            if not table:
+                print(f"No table found after h3: {h3_text}")
+                continue
+
+            # Parse the table
             rows = parse_table(table)
             if not rows:
+                print(f"No rows extracted from table under: {h3_text}")
                 continue
 
-            # Determine output filename for this table
-            output_filename = table_filenames.get(idx, f"table_{idx}.csv")
-
-            if not rows:
-                print(f"No rows extracted from table {idx}")
-                continue
+            # Create filename from h3 text (replace spaces with underscores)
+            filename = h3_text.replace(" ", "_")
+            output_filename = f"recources/codes/{filename}.csv"
 
             # normalize rows to equal length and write CSV
             max_cols = max(len(r) for r in rows)
             csv_file = Path(output_filename)
+
+            # Create directory if it doesn't exist
+            csv_file.parent.mkdir(parents=True, exist_ok=True)
+
             with csv_file.open("w", newline="", encoding="utf-8") as fh:
                 writer = csv.writer(fh)
                 for r in rows:
@@ -224,8 +245,8 @@ class DataCollector:
                         r = r + [""] * (max_cols - len(r))
                     writer.writerow(r)
 
-            all_rows[idx] = len(rows)
-            print(f"Wrote {len(rows)} rows to {csv_file}")
+            all_rows[h3_text] = len(rows)
+            print(f"Wrote {len(rows)} rows to {csv_file} (from '{h3_text}')")
 
         return all_rows
 

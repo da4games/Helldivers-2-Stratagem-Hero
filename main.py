@@ -105,12 +105,8 @@ class ImageLoader:
 class stratagemHero:
     def __init__(self, all_rows):
         self.current_script_path = os.path.abspath(__file__)
-        self.stratagems_directory = os.path.join(
-            os.path.dirname(self.current_script_path), "recources/codes/stratagems.csv"
-        )
-        self.mission_directory = os.path.join(
-            os.path.dirname(self.current_script_path),
-            "recources/codes/mission_stratagems.csv",
+        self.codes_directory = os.path.join(
+            os.path.dirname(self.current_script_path), "recources/codes"
         )
 
         # Get paths to resource directories
@@ -122,82 +118,94 @@ class stratagemHero:
 
         self.all_rows = all_rows
 
-        self.column_names = {
-            "Department": 0,
-            "Icon": 1,
-            "Stratagem": 2,
-            "Stratagem Codes": 3,
-            "Cooldown": 4,
-            "Cost": 5,
-            "Unlock Level": 6,
-            "Description": 7,
-        }
-
-        self.mission_column_names = {
-            "Type": 0,
-            "Icon": 1,
-            "Stratagem": 2,
-            "Stratagem Codes": 3,
-            "Description": 4,
-        }
-
         self.total_rows = 0
         for count in all_rows.values():
             self.total_rows += count
 
-        self.stratagems_df = pd.read_csv(self.stratagems_directory, header=None)
-        self.mission_df = pd.read_csv(self.mission_directory, header=None)
+        # Load all stratagem CSV files and combine them
+        self.stratagem_categories = [
+            "Support_Weapons",
+            "Orbital_Strikes",
+            "Eagle_Strikes",
+            "Emplacements",
+            "Sentries",
+            "Backpacks",
+            "Vehicles",
+            "Ship",
+            "Objective",
+            "Other",
+        ]
+
+        # Dictionary to map indices to (dataframe, local_index, category)
+        self.index_map = {}
+        self.stratagems_dfs = {}
+        current_index = 0
+
+        for category in self.stratagem_categories:
+            csv_path = os.path.join(self.codes_directory, f"{category}.csv")
+            if os.path.exists(csv_path):
+                # Read with headers, skip the first row (which is the header)
+                df = pd.read_csv(csv_path)
+                self.stratagems_dfs[category] = df
+
+                # Map global indices to this dataframe (skip header row)
+                for local_idx in range(len(df)):
+                    self.index_map[current_index] = (df, local_idx, category)
+                    current_index += 1
+            else:
+                console.print(f"Warning: {csv_path} not found")
 
         self.search_dirs = [self.stratagem_icons_dir, self.arrows_dir]
 
         self.compatibility_mode = False
 
-        console.print(f"stratagemHero initialized with {all_rows} stratagems.")
+        console.print(
+            f"stratagemHero initialized with {self.total_rows} stratagems from {len(self.stratagem_categories)} categories."
+        )
 
     def get_stratagem_table_entry(self, index, column_name: str):
-        index += 1  # Adjust for header row in CSV files
-        if index > self.total_rows:
+        """Get a stratagem entry by global index and column name.
+
+        Supported column names:
+        - Icon: Icon filename
+        - Name: Stratagem name
+        - Stratagem Code: The code input sequence
+        """
+        if index not in self.index_map:
             return None
 
-        # Stratagems CSV
-        if index <= self.all_rows[0]:
-            if index < len(self.stratagems_df):
-                col_idx = self.column_names[column_name]
-                return self.stratagems_df.iloc[index, col_idx]
+        df, local_idx, category = self.index_map[index]
 
-        # Mission CSV
-        else:
-            mission_index = index - self.all_rows[0]
-            if mission_index < len(self.mission_df):
-                col_idx = (
-                    self.mission_column_names["Type"]
-                    if column_name == "Department"
-                    else self.mission_column_names[column_name]
-                )
-                return self.mission_df.iloc[mission_index, col_idx]
+        # Check if the column exists in this dataframe
+        if column_name not in df.columns:
+            return None
 
-        return None
+        try:
+            value = df.loc[local_idx, column_name]
+            # Return None for NaN values
+            if pd.isna(value):
+                return None
+            return value
+        except (KeyError, IndexError):
+            return None
 
     def validate_stratagem_codes(self):
         codes = []
-        # check if any index returns "None", an error or the header of the CSV file
+        # check if any index returns "None", an error or invalid data
         for i in range(self.total_rows):
-            data = self.get_stratagem_table_entry(i, "Stratagem Codes")
+            data = self.get_stratagem_table_entry(i, "Stratagem Code")
 
-            if not "Stratagem" in str(data):
-                console.print(f"Stratagem code at index {i}: {data}")
+            if data is None:
+                console.print(f"Stratagem code at index {i}: None")
                 console.print(
                     "This is likely an issue with the csv file or the parsing process. Please check the CSV files and ensure they are formatted correctly."
-                )
-            elif "Codes" in str(data):
-                console.print(f"Stratagem code at index {i}: {data}")
-                console.print(
-                    "This should NOT happen! This means the header row is being returned as data, which indicates an issue with the CSV file or the parsing process. Please check the CSV files and ensure they are formatted correctly."
                 )
             else:
                 codes.append(data)
 
-        console.print(f"All {self.total_rows} stratagem codes validated!")
+        console.print(
+            f"All {len(codes)} stratagem codes validated out of {self.total_rows} total stratagems!"
+        )
         # for idx, code in enumerate(codes):
         #    console.print(f"Index {idx}: {code}")
         # This means we now have all stratagems available by indexes from 0 to total_rows and are ignoring the header correctly.
@@ -234,7 +242,7 @@ class stratagemHero:
     def parse_stratagem_code(self, index):
         arrow_code = ""
         normal_code = []
-        code = self.get_stratagem_table_entry(index, "Stratagem Codes")
+        code = self.get_stratagem_table_entry(index, "Stratagem Code")
         code = str(code) if code is not None else ""
 
         for part in code.split("|"):
@@ -339,7 +347,7 @@ class stratagemHero:
                 )
                 stratagem_icons.append(loader.load(icon_path, size=(50, 50)))
 
-            full_code = self.get_stratagem_table_entry(stratagem, "Stratagem Codes")
+            full_code = self.get_stratagem_table_entry(stratagem, "Stratagem Code")
             split_code = str(full_code).split(" | ")
             update = True
             arrow_code, normal_code = self.parse_stratagem_code(stratagem)
@@ -375,7 +383,7 @@ class stratagemHero:
                         incorrect_input = True
                         completed_indices = 0
                         update = True
-                
+
             def update_screen(incorrect: bool = False):
                 screen.fill((0, 0, 0))
 
@@ -437,16 +445,16 @@ class stratagemHero:
                     )
                     if incorrect:
                         arrow_scaled = tint_surface(arrow_scaled, (255, 0, 0, 255))
-                        
+
                     elif index < completed_indices:
                         arrow_scaled = tint_surface(arrow_scaled, (255, 255, 0, 255))
-                        
+
                     x = start_x + index * (arrow_size + arrow_spacing)
                     screen.blit(arrow_scaled, (x, 300))  # draw arrow
 
                 # how do I display the name of the stratagem between the icon and the arrows
                 font = pygame.font.SysFont(None, 36)
-                stratagem_name = self.get_stratagem_table_entry(stratagem, "Stratagem")
+                stratagem_name = self.get_stratagem_table_entry(stratagem, "Name")
                 text_surface = font.render(str(stratagem_name), True, (255, 255, 255))
                 text_x = (screen.get_width() - text_surface.get_width()) // 2
                 screen.blit(text_surface, (text_x, 250))
@@ -457,11 +465,14 @@ class stratagemHero:
                 update_screen(incorrect_input)
                 update = False
                 if incorrect_input:
-                    pygame.time.delay(250)  # Brief pause to show red arrows on incorrect input
+                    pygame.time.delay(
+                        250
+                    )  # Brief pause to show red arrows on incorrect input
                     update_screen()  # Refresh screen to remove red arrows after delay
-        
+
         print(f"Your final score: {score}")
         pygame.quit()
+
 
 if __name__ == "__main__":
     console.print("Loading stratagems from the wiki . . .")
