@@ -299,10 +299,11 @@ class stratagemHero:
         split_code = ""
         arrow_code = ""
         normal_code = []
+        stratagems_complete = 0  # resets per round
+        stratagems_in_round = 6
 
         key_lookup = {"up": "w", "down": "s", "left": "a", "right": "d"}
 
-        # how do I get the pressed key in pygame
         pygame.init()
         screen = pygame.display.set_mode((1000, 600))
         pygame.display.set_caption("Stratagem Hero - Press the correct keys in order!")
@@ -324,8 +325,7 @@ class stratagemHero:
 
         def load_new_stratagem():
             nonlocal stratagem, stratagems, stratagem_scaled, completed_indices, update, split_code, arrow_code, normal_code, stratagem_icons
-            for _ in range(6 - len(stratagems)):
-                # ensure we have 6 stratagems backed up
+            for _ in range(stratagems_in_round - stratagems_complete - len(stratagems)):
                 stratagems.append(random.randint(0, self.total_rows - 1))
 
             stratagem = stratagems[0]
@@ -374,8 +374,19 @@ class stratagemHero:
                         update = True  # Trigger screen update to show progress
                         if completed_indices >= len(normal_code):
                             score += len(normal_code) * 5
+                            stratagems_complete += 1
                             stratagems.pop(0)
+
+                            if stratagems_complete >= stratagems_in_round:
+                                console.print(
+                                    f"Round complete! You completed {stratagems_complete} stratagems and scored {score} points!"
+                                )
+                                stratagems_complete = 0
+                                stratagems_in_round += 1
+                                stratagems = []
+
                             load_new_stratagem()  # Load a new stratagem when the current one is complete
+
                     else:
                         print(
                             f"Incorrect key! Expected '{normal_code[completed_indices]}' but got '{pygame.key.name(event.key)}'. Try again."

@@ -1,7 +1,6 @@
 import requests
 import csv
 from pathlib import Path
-import os
 import time
 
 
